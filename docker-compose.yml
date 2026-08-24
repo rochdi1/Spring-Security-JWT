@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  # 1. PostgreSQL Datenbank-Dienst
+  postgres-db:
+    image: postgres:16-alpine
+    container_name: springboot_postgres
+    environment:
+      POSTGRES_DB: auth_product_db
+      POSTGRES_USER: app_user
+      POSTGRES_PASSWORD: secure_password_123
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U app_user -d auth_product_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # 2. Spring Boot Anwendungs-Dienst
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: springboot_auth_api
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-db:5432/auth_product_db
+      - SPRING_DATASOURCE_USERNAME=app_user
+      - SPRING_DATASOURCE_PASSWORD=secure_password_123
+      - SPRING_JPA_HIBERNATE_DDL_AUTO=update
+      - SPRING_JPA_SHOW_SQL=true
+      # JWT Konfiguration direkt als Umgebungsvariablen injizieren
+      - JWT_SECRET=3c9c3524b5e7d5904d9c3524b5e7d5904d9c3524b5e7d5904d9c3524b5e7d590
+      - JWT_ACCESS_EXPIRATION=9000000 # 15 Minuten in ms
+      - JWT_REFRESH_EXPIRATION=86400000 # 24 Stunden in ms
+    depends_on:
+      postgres-db:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
