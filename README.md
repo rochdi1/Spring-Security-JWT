@@ -220,4 +220,11 @@ docker compose down
 ```bash
 docker compose logs -f app
 ```
+ ***Docker-Cache erzwingen zu leeren***
+ 
+ Führen Sie den Befehl mit dem Flag --no-cache aus, um Docker zu zwingen, das echte Java 21 Image frisch herunterzuladen:
+ ```bash
+ docker compose build --no-cache
+ docker compose up -d
+```
 
