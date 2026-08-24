@@ -228,3 +228,264 @@ docker compose logs -f app
  docker compose up -d
 ```
 
+To expand your project into a full production-ready CI/CD pipeline, we will migrate from PostgreSQL to MySQL, add SonarQube for code quality analysis, configure Jenkins to automate the build, and deploy the entire application to Kubernetes.Here is the complete configuration setup.
+**1. Updated Dockerfile (Java 21)**
+
+This Dockerfile uses a multi-stage build with Eclipse Temurin 21. It is optimized for Jenkins to run unit tests and build the application inside the pipeline.
+
+```dockerfile
+# Stage 1: Build & Test
+FROM maven:3.9.6-eclipse-temurin-21 AS build
+WORKDIR /app
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+COPY src ./src
+# Jenkins will trigger tests, but for the final image construction we package it
+RUN mvn clean package -DskipTests
+
+# Stage 2: Minimal Runtime
+FROM eclipse-temurin:21-jre-alpine
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
+EXPOSE 8080
+ENTRYPOINT ["java", "-jar", "app.jar"]
+```
+**2. Local Infrastructure:** docker-compose.yml
+
+This file spins up your MySQL database, Jenkins, and SonarQube locally so they can interact with each other.
+```yaml
+version: '3.8'
+
+services:
+  # MySQL Database
+  mysql-db:
+    image: mysql:8.0
+    container_name: springboot_mysql
+    environment:
+      MYSQL_DATABASE: auth_product_db
+      MYSQL_USER: app_user
+      MYSQL_PASSWORD: secure_password_123
+      MYSQL_ROOT_PASSWORD: root_password_123
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # SonarQube for Code Quality
+  sonarqube:
+    image: sonarqube:community
+    container_name: sonarqube_server
+    ports:
+      - "9000:9000"
+    networks:
+      - ci_network
+    environment:
+      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+
+  # Jenkins CI/CD Automation Server
+  jenkins:
+    image: jenkins/jenkins:lts-jdk17
+    container_name: jenkins_server
+    privileged: true
+    user: root
+    ports:
+      - "8082:8080"
+      - "50000:50000"
+    networks:
+      - ci_network
+    environment:
+      - DOCKER_HOST=tcp://docker:2375
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock # Allows Jenkins to build Docker images
+
+networks:
+  ci_network:
+    driver: bridge
+
+volumes:
+  mysql_data:
+  jenkins_data:
+  sonarqube_data:
+  sonarqube_extensions:
+```
+Note: Run docker compose up -d to launch these infrastructure services.
+**3. Pipeline Automation:**
+JenkinsfilePlace this file in the root directory of your project. It automates testing, code scanning via SonarQube, building the Docker image, and deploying to Kubernetes.
+
+```groovy
+pipeline {
+    agent any
+    
+    tools {
+        maven 'Maven3' // Must match the name configured in Jenkins Global Tool Configuration
+    }
+    
+    environment {
+        DOCKER_IMAGE = "your-dockerhub-username/jwt-security-api"
+        IMAGE_TAG = "${BUILD_NUMBER}"
+    }
+    
+    stages {
+        stage('Checkout') {
+            steps {
+                checkout scm
+            }
+        }
+        
+        stage('Unit Tests') {
+            steps {
+                sh 'mvn clean test'
+            }
+        }
+        
+        stage('SonarQube Quality Gate') {
+            steps {
+                // Ensure you have configured the SonarQube server in Jenkins settings
+                withSonarQubeEnv('SonarQube') {
+                    sh 'mvn sonar:sonar -Dsonar.projectKey=jwt-security-api'
+                }
+            }
+        }
+        
+        stage('Build Docker Image') {
+            steps {
+                sh "docker build -t ${DOCKER_IMAGE}:${IMAGE_TAG} ."
+                sh "docker tag ${DOCKER_IMAGE}:${IMAGE_TAG} ${DOCKER_IMAGE}:latest"
+            }
+        }
+        
+        stage('Push to Registry') {
+            steps {
+                withCredentials([usernamePassword(credentialsId: 'docker-hub-credentials', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
+                    sh "echo ${PASS} | docker login -u ${USER} --password-stdin"
+                    sh "docker push ${DOCKER_IMAGE}:${IMAGE_TAG}"
+                    sh "docker push ${DOCKER_IMAGE}:latest"
+                }
+            }
+        }
+        
+        stage('Deploy to Kubernetes') {
+            steps {
+                // Applies the deployment manifest to your Kubernetes Cluster
+                sh "sed -i 's|IMAGE_PLACEHOLDER|${DOCKER_IMAGE}:${IMAGE_TAG}|g' k8s-deployment.yml"
+                sh "kubectl apply -f k8s-deployment.yml"
+            }
+        }
+    }
+}
+```
+**4. Orchestration:** k8s-deployment.yml
+
+This manifest defines how your application and MySQL instances run inside a Kubernetes cluster (e.g., Minikube, EKS, or GKE).
+
+```yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_DATABASE
+          value: auth_product_db
+        - name: MYSQL_USER
+          value: app_user
+        - name: MYSQL_PASSWORD
+          value: secure_password_123
+        - name: MYSQL_ROOT_PASSWORD
+          value: root_password_123
+        ports:
+        - containerPort: 3306
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+spec:
+  ports:
+  - port: 3306
+  selector:
+    app: mysql
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: springboot-api-deployment
+spec:
+  replicas: 2 # High-availability mode
+  selector:
+    matchLabels:
+      app: springboot-api
+  template:
+    metadata:
+      labels:
+        app: springboot-api
+    spec:
+      containers:
+      - name: springboot-api
+        image: IMAGE_PLACEHOLDER # Automatically updated by Jenkins
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: jdbc:mysql://mysql-service:3306/auth_product_db?allowPublicKeyRetrieval=true&useSSL=false
+        - name: SPRING_DATASOURCE_USERNAME
+          value: app_user
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: secure_password_123
+        - name: JWT_SECRET
+          value: 3c9c3524b5e7d5904d9c3524b5e7d5904d9c3524b5e7d5904d9c3524b5e7d590
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: springboot-api-service
+spec:
+  type: LoadBalancer # Exposes your Spring API outside the cluster
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: springboot-api
+```
+**5. Application Configuration Update**
+
+Update your src/main/resources/application.properties (or .yml) file to support the MySQL driver dynamically via environment variables:
+```properties
+
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/auth_product_db}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:app_user}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secure_password_123}
+spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
+
+spring.jpa.hibernate.ddl-auto=update
+spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect
+Use code with caution.Make sure your pom.xml contains the MySQL connector dependency instead of PostgreSQL:xml<dependency>
+    <groupId>com.mysql</groupId>
+    <artifactId>mysql-connector-j</artifactId>
+    <scope>runtime</scope>
+</dependency>
+```
+
+
