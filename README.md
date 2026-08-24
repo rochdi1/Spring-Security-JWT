@@ -492,4 +492,7 @@ Use code with caution.Make sure your pom.xml contains the MySQL connector depend
 </dependency>
 ```
 
-
+sehen alle logs auch jenkins-server
+```bash
+docker-compose logs -f -t
+```
