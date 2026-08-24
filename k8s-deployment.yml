@@ -1,0 +1,79 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        env:
+        - name: MYSQL_DATABASE
+          value: auth_product_db
+        - name: MYSQL_USER
+          value: app_user
+        - name: MYSQL_PASSWORD
+          value: secure_password_123
+        - name: MYSQL_ROOT_PASSWORD
+          value: root_password_123
+        ports:
+        - containerPort: 3306
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-service
+spec:
+  ports:
+  - port: 3306
+  selector:
+    app: mysql
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: springboot-api-deployment
+spec:
+  replicas: 2 # High-availability mode
+  selector:
+    matchLabels:
+      app: springboot-api
+  template:
+    metadata:
+      labels:
+        app: springboot-api
+    spec:
+      containers:
+      - name: springboot-api
+        image: IMAGE_PLACEHOLDER # Automatically updated by Jenkins
+        ports:
+        - containerPort: 8080
+        env:
+        - name: SPRING_DATASOURCE_URL
+          value: jdbc:mysql://mysql-service:3306/auth_product_db?allowPublicKeyRetrieval=true&useSSL=false
+        - name: SPRING_DATASOURCE_USERNAME
+          value: app_user
+        - name: SPRING_DATASOURCE_PASSWORD
+          value: secure_password_123
+        - name: JWT_SECRET
+          value: 3c9c3524b5e7d5904d9c3524b5e7d5904d9c3524b5e7d5904d9c3524b5e7d590
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: springboot-api-service
+spec:
+  type: LoadBalancer # Exposes your Spring API outside the cluster
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: springboot-api
