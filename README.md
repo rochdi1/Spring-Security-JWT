@@ -208,3 +208,16 @@ curl -X DELETE http://localhost:8080/api/products/1 \
 *   **Role based authorization**
 *   **Validation for all entities**
 
+**Befehle zum StartenStarten (inklusive Build der App):**
+```bash
+docker compose up --build -d
+```
+**Stoppen:**
+```bash
+docker compose down
+```
+**Logs einsehen:**
+```bash
+docker compose logs -f app
+```
+
