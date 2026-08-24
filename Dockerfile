@@ -1,15 +1,16 @@
-# Stage 1: Build der Anwendung mit Maven
-FROM maven:3.8.5-openjdk-17 AS build
+# Stage 1: Build der Anwendung mit Maven (nutzt Temurin JDK 17)
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 COPY pom.xml .
-# Abhängigkeiten vorab herunterladen (nutzt Docker Caching)
-RUN mvc dependency:go-offline -B
+# Abhängigkeiten vorab herunterladen für besseres Caching
+RUN mvn dependency:go-offline -B
 COPY src ./src
 RUN mvn clean package -DskipTests
 
-# Stage 2: Leichtgewichtiges Laufzeit-Image
-FROM openjdk:17-jdk-slim
+# Stage 2: Sicheres und schlankes Laufzeit-Image mit Eclipse Temurin 17
+FROM eclipse-temurin:17-jre-alpine
 WORKDIR /app
 COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
+
