@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-# MySQL Database
+  # 1. MySQL Database
   mysql-db:
     image: mysql:8.0
     container_name: springboot_mysql
@@ -12,6 +12,8 @@ services:
       MYSQL_ROOT_PASSWORD: root_password_123
     ports:
       - "3306:3306"
+    networks:
+      - ci_network
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
@@ -19,25 +21,39 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
-  # 1. PostgreSQL Datenbank-Dienst
-  #postgres-db:
-    #image: postgres:16-alpine
-    #container_name: springboot_postgres
-    #environment:
-      #POSTGRES_DB: auth_product_db
-      #POSTGRES_USER: app_user
-      #POSTGRES_PASSWORD: secure_password_123
-    #ports:
-      #- "5432:5432"
-    #volumes:
-      #- postgres_data:/var/lib/postgresql/data
-    #healthcheck:
-      #test: ["CMD-SHELL", "pg_isready -U app_user -d auth_product_db"]
-      #interval: 5s
-      #timeout: 5s
-      #retries: 5
 
-  # 2. Spring Boot Anwendungs-Dienst
+  # 2. SonarQube for Code Quality
+  sonarqube:
+    image: sonarqube:community
+    container_name: sonarqube_server
+    ports:
+      - "9000:9000"
+    networks:
+      - ci_network
+    environment:
+      - SONAR_ES_BOOTSTRAP_CHECKS_DISABLE=true
+    volumes:
+      - sonarqube_data:/opt/sonarqube/data
+      - sonarqube_extensions:/opt/sonarqube/extensions
+
+  # 3. Jenkins CI/CD Automation Server
+  jenkins:
+    image: jenkins/jenkins:lts-jdk17
+    container_name: jenkins_server
+    privileged: true
+    user: root
+    ports:
+      - "8082:8080"
+      - "50000:50000"
+    networks:
+      - ci_network
+    environment:
+      - DOCKER_HOST=tcp://docker:2375
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+
+  # 4. Spring Boot Anwendungs-Dienst
   app:
     build:
       context: .
@@ -45,19 +61,29 @@ services:
     container_name: springboot_auth_api
     ports:
       - "8080:8080"
+    networks:
+      - ci_network
     environment:
-      - SPRING_DATASOURCE_URL=jdbc:postgresql://postgres-db:5432/auth_product_db
+      # KORRIGIERT: Wechsel von PostgreSQL auf MySQL URL und Hostname
+      - SPRING_DATASOURCE_URL=jdbc:mysql://mysql-db:3306/auth_product_db?allowPublicKeyRetrieval=true&useSSL=false
       - SPRING_DATASOURCE_USERNAME=app_user
       - SPRING_DATASOURCE_PASSWORD=secure_password_123
       - SPRING_JPA_HIBERNATE_DDL_AUTO=update
       - SPRING_JPA_SHOW_SQL=true
-      # JWT Konfiguration direkt als Umgebungsvariablen injizieren
       - JWT_SECRET=3c9c3524b5e7d5904d9c3524b5e7d5904d9c3524b5e7d5904d9c3524b5e7d590
-      - JWT_ACCESS_EXPIRATION=9000000 # 15 Minuten in ms
-      - JWT_REFRESH_EXPIRATION=86400000 # 24 Stunden in ms
+      - JWT_ACCESS_EXPIRATION=9000000 
+      - JWT_REFRESH_EXPIRATION=86400000 
     depends_on:
-      postgres-db:
+      # KORRIGIERT: Saubere Abhängigkeit zu MySQL healthcheck
+      mysql-db:
         condition: service_healthy
 
+networks:
+  ci_network:
+    driver: bridge
+
 volumes:
-  postgres_data:
+  mysql_data:
+  jenkins_data:
+  sonarqube_data:
+  sonarqube_extensions:
