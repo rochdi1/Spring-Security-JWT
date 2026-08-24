@@ -481,7 +481,11 @@ spring.datasource.driver-class-name=com.mysql.cj.jdbc.Driver
 
 spring.jpa.hibernate.ddl-auto=update
 spring.jpa.database-platform=org.hibernate.dialect.MySQLDialect
-Use code with caution.Make sure your pom.xml contains the MySQL connector dependency instead of PostgreSQL:xml<dependency>
+```
+Use code with caution.Make sure your pom.xml contains the MySQL connector dependency instead of PostgreSQL:
+
+```xml
+<dependency>
     <groupId>com.mysql</groupId>
     <artifactId>mysql-connector-j</artifactId>
     <scope>runtime</scope>
