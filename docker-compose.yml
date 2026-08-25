@@ -48,6 +48,7 @@ services:
     networks:
       - ci_network
     environment:
+      - JENKINS_ADMIN_PASSWORD=${JENKINS_ROOT_PASSWORD} # Holt den Wert aus der .env
       - DOCKER_HOST=tcp://docker:2375
     volumes:
       - jenkins_data:/var/jenkins_home
