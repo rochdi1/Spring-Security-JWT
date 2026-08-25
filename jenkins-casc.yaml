@@ -107,35 +107,25 @@ jobs:
           }
       }
 
-# Sample Job Configuration
-jobs:
-  - script: |
-      pipelineJob('example-pipeline-job') {
-      definition {
-        cps {
-            script('''
-                pipeline {
-                    agent any
-                    stages {
-                        stage('Build') {
-                            steps {
-                                echo 'Building...'
-                            }
-                        }
-                        stage('Test') {
-                            steps {
-                                echo 'Testing...'
-                            }
-                        }
-                        stage('Deploy') {
-                            steps {
-                                echo 'Deploying...'
-                            }
-                        }
-                    }
-                }
-            '''.stripIndent())
-            sandbox(true)
-            }
+      # 🚀 Job 3: Dritte Pipeline
+      pipelineJob('zweite-beispiel-pipeline') {
+          description('Das ist der dritte Pipeline-Job aus JCasC.')
+          definition {
+              cps {
+                  script('''
+                      pipeline {
+                          agent any
+                          stages {
+                              stage('Test') {
+                                  steps {
+                                      echo 'Führe Tests für Anwendung 2 aus...'
+                                  }
+                              }
+                          }
+                      }
+                  '''.stripIndent())
+                  sandbox(true)
+              }
           }
-        } 
+      }
+ 
