@@ -1,0 +1,5 @@
+git:5.0.0
+workflow-aggregator:600.vb_57cdd26fdd7
+configuration-as-code:2053.vb_0da_47381a_25
+matrix-auth:3.2.10
+job-dsl:1.87
