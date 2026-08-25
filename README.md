@@ -253,6 +253,7 @@ ENTRYPOINT ["java", "-jar", "app.jar"]
 **2. Local Infrastructure:** docker-compose.yml
 
 This file spins up your MySQL database, Jenkins, and SonarQube locally so they can interact with each other.
+
 ```yaml
 version: '3.8'
 
@@ -318,7 +319,9 @@ volumes:
   sonarqube_extensions:
 ```
 Note: Run docker compose up -d to launch these infrastructure services.
+
 **3. Pipeline Automation:**
+
 JenkinsfilePlace this file in the root directory of your project. It automates testing, code scanning via SonarQube, building the Docker image, and deploying to Kubernetes.
 
 ```groovy
@@ -472,8 +475,8 @@ spec:
 **5. Application Configuration Update**
 
 Update your src/main/resources/application.properties (or .yml) file to support the MySQL driver dynamically via environment variables:
-```properties
 
+```properties
 spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:mysql://localhost:3306/auth_product_db}
 spring.datasource.username=${SPRING_DATASOURCE_USERNAME:app_user}
 spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:secure_password_123}
@@ -491,13 +494,15 @@ Use code with caution.Make sure your pom.xml contains the MySQL connector depend
     <scope>runtime</scope>
 </dependency>
 ```
-
 sehen alle logs auch jenkins-server
+
 ```bash
 docker-compose logs -f -t
 ```
 To fully connect your CI/CD pipeline, you need to install specific plugins in Jenkins, configure the global tools, and link SonarQube with a webhook.Here is the exact step-by-step guide to setting up your Jenkins automation server.
+
 ***1. Required Jenkins Plugins***
+
 Log into your Jenkins UI (http://localhost:8082), navigate to Dashboard > Manage Jenkins > Plugins > Available Plugins, and install the following:
 *  SonarQube Scanner: Integrates code analysis into your builds.
 *  Docker Pipeline: Allows Jenkins steps to interact with Docker commands inside the pipeline script.
@@ -505,42 +510,58 @@ Log into your Jenkins UI (http://localhost:8082), navigate to Dashboard > Manage
 *  Pipeline Stage View: Provides a visual dashboard of your deployment stages.
   
 ***2. Configure SonarQube Token & Webhook*** 
+
 **Step A: Generate a Token in SonarQube**
+
 *  Open SonarQube (http://localhost:9000) and log in (default credentials: admin / admin).
 *  Navigate to My Account > Security > Tokens.
 *  Generate a new User Token or Project Analysis Token named jenkins-token.
 *  Copy this token immediately; you will not see it again.
+  
 **Step B: Add Token to Jenkins Credentials**
+
 *  Go to Jenkins Dashboard > Manage Jenkins > Credentials > System > Global credentials > Add Credentials.
 *  Kind: Secret text
 *  Secret: Paste your copied SonarQube token here.
 *  ID: sonarqube-token (Keep this exact name for your pipeline script).
+   
 **Step C: Create a Webhook in SonarQube (Crucial for Quality Gates)**
+
 A webhook tells Jenkins when the scan is finished so the pipeline can decide to continue or fail.
 * In SonarQube, go to Administration > Configuration > Webhooks.
 * Click Create.
 * Name: Jenkins Webhook
 * URL: http://jenkins_server:8080/sonarqube-webhook/ (Note: Since they share the ci_network inside Docker, use the internal container name jenkins_server and its default inner port 8080).
+
 ***3. Configure Global System Tools in Jenkins***
+  
    Go to Dashboard > Manage Jenkins > Tools to define your build utilities.
+  
 **Maven Configuration**
+  
 * Scroll down to Maven installations.
 * Click Add Maven.
 * Name: Maven3 (This must exactly match the tools { maven 'Maven3' } reference in your Jenkinsfile).
 * Check Install automatically and select version 3.9.6 (or latest).
+* 
 **SonarQube Scanner Configuration**
+  
 * Scroll down to SonarQube Scanner installations.
 * Click Add SonarQube Scanner.
 * Name: SonarQubeScanner.
 * Check Install automatically.
+  
 ***4. Link SonarQube Server in Jenkins Settings***
+
 * Go to Dashboard > Manage Jenkins > System.
 * Scroll down to the SonarQube servers section.
 * Check Enable injection of SonarQube server configuration as environment variables.Click Add SonarQube.
 * Name: SonarQube (This matches withSonarQubeEnv('SonarQube') in your script).
 * Server URL: http://sonarqube_server:9000 (Using the internal Docker network name).
 * Server authentication token: Select the sonarqube-token credential you created in Step 2B.
+  
 ***5. Final Step: Docker Hub Credentials***
+
    To allow Jenkins to push your compiled Java 21 app image to Docker Hub, add one last credential:
 * Go to Manage Jenkins > Credentials > System > Global credentials > Add Credentials.
 * Kind: Username with password.
