@@ -50,10 +50,66 @@ tool:
               installers:
                 - maven:
                     id: "3.8.4"
+jobs:
+  - script: |
+      # 🚀 Job 1: Erste Pipeline
+      pipelineJob('erste-beispiel-pipeline') {
+          description('Das ist der erste Pipeline-Job aus JCasC.')
+          definition {
+              cps {
+                  script('''
+                      pipeline {
+                          agent any
+                          stages {
+                              stage('Build') {
+                                  steps {
+                                      echo 'Building...'
+                                      echo 'Kompiliere Anwendung 1...'
+                                  }
+                              }
+                            stage('Test') {
+                                steps {
+                                    echo 'Testing...'
+                                }
+                            }
+                            stage('Deploy') {
+                                steps {
+                                    echo 'Deploying...'
+                                }
+                            }
+                          }
+                      }
+                  '''.stripIndent())
+                  sandbox(true)
+              }
+          }
+      }
+
+      # 🚀 Job 2: Zweite Pipeline
+      pipelineJob('zweite-beispiel-pipeline') {
+          description('Das ist der zweite Pipeline-Job aus JCasC.')
+          definition {
+              cps {
+                  script('''
+                      pipeline {
+                          agent any
+                          stages {
+                              stage('Test') {
+                                  steps {
+                                      echo 'Führe Tests für Anwendung 2 aus...'
+                                  }
+                              }
+                          }
+                      }
+                  '''.stripIndent())
+                  sandbox(true)
+              }
+          }
+      }
 
 # Sample Job Configuration
 jobs:
-  - script: >
+  - script: |
       pipelineJob('example-pipeline-job') {
       definition {
         cps {
@@ -78,7 +134,8 @@ jobs:
                         }
                     }
                 }
-            ''')
+            '''.stripIndent())
+            sandbox(true)
             }
           }
         } 
